@@ -1,0 +1,11 @@
+[package]
+description = "mdast-compliant Markdown parser in Rust with ASTs and extensions."
+documentation = "https://docs.rs/markdown-rs"
+edition = "2021"
+keywords = ["markdown", "mdast", "ASTs"]
+license-file = "LICENSE"
+name = "markdown-rs"
+readme = "README.md"
+version = "0.1.0"
+
+[dependencies]
