@@ -6,6 +6,33 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum AstError {}
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "referencetype")
+)]
+#[repr(C)]
+pub enum ReferenceType {
+    Shortcut,
+    Collapsed,
+    Full,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "aligntype")
+)]
+#[repr(C)]
+pub enum AlignType {
+    Left,
+    Right,
+    Center,
+    None,
+}
+
 /// `mdast` associated [Result] type.
 pub type AstResult<T> = Result<T, AstError>;
 
@@ -17,6 +44,12 @@ pub trait ListContent {}
 
 /// Phrasing content represent the text in a document, and its markup.
 pub trait PhrasingContent {}
+
+/// Table content represent the rows in a table.
+pub trait TableContent {}
+
+/// Row content represent the cells in a row.
+pub trait RowContent {}
 
 /// [mdast](https://github.com/syntax-tree/mdast#list) variant type.
 #[derive(Clone, Eq, PartialEq)]
@@ -508,7 +541,7 @@ pub struct LinkReference {
     pub label: Option<String>,
     /// A referenceType field must be present. Its value must be a referenceType.
     /// It represents the explicitness of the reference.
-    pub reference_type: String,
+    pub reference_type: ReferenceType,
 }
 
 parent!(LinkReference, PhrasingContent);
@@ -564,3 +597,126 @@ pub struct ImageReference {
 /// ImageReference can be used where phrasing content is expected.
 /// Its content model is phrasing content.
 impl PhrasingContent for ImageReference {}
+
+/// Delete (Parent) represents contents that are no longer accurate or no longer relevant.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "delete")
+)]
+pub struct Delete {
+    /// Children node list.
+    pub children: Vec<Node>,
+}
+
+parent!(Delete, PhrasingContent);
+
+/// ImageReference can be used where phrasing content is expected.
+/// Its content model is phrasing content.
+impl PhrasingContent for Delete {}
+
+/// FootnoteDefinition (Node) represents a marker through association.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "footnotedefinition")
+)]
+pub struct FootnoteDefinition {
+    /// Children node list.
+    pub children: Vec<Node>,
+    /// An identifier field must be present. It can match another node.
+    /// identifier is a source value: character escapes and character
+    /// references are not parsed. Its value must be normalized.
+    pub identifier: String,
+    /// A label field can be present.
+    /// label is a string value: it works just like title on a link or a lang on
+    /// code: character escapes and character references are parsed.
+    pub label: Option<String>,
+}
+
+parent!(FootnoteDefinition, FlowContent);
+
+/// FootnoteDefinition can be used where flow content is expected.
+///  Its content model is also flow content.
+impl FlowContent for FootnoteDefinition {}
+
+/// FootnoteReference (Node) represents a marker through association.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "footnotedefinition")
+)]
+pub struct FootnoteReference {
+    /// An identifier field must be present. It can match another node.
+    /// identifier is a source value: character escapes and character
+    /// references are not parsed. Its value must be normalized.
+    pub identifier: String,
+    /// A label field can be present.
+    /// label is a string value: it works just like title on a link or a lang on
+    /// code: character escapes and character references are parsed.
+    pub label: Option<String>,
+}
+
+/// FootnoteReference can be used where phrasing content is expected.
+/// It has no content model.
+impl PhrasingContent for FootnoteReference {}
+
+/// Table (Parent) represents two-dimensional data.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "table")
+)]
+pub struct Table {
+    /// Children node list.
+    pub children: Vec<Node>,
+    /// An align field can be present. If present, it must be a list of alignTypes.
+    /// It represents how cells in columns are aligned.
+    pub align: Vec<AlignType>,
+}
+
+parent!(Table, TableContent);
+
+/// FootnoteDefinition can be used where flow content is expected.
+///  Its content model is also flow content.
+impl FlowContent for Table {}
+
+/// TableCell (Parent) represents a header cell in a Table,
+///  if its parent is a head, or a data cell otherwise.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "footnotedefinition")
+)]
+pub struct TableCell {
+    /// Children node list.
+    pub children: Vec<Node>,
+}
+
+parent!(TableCell, PhrasingContent);
+
+/// TableCell can be used where row content is expected.
+/// Its content model is phrasing content excluding Break nodes.
+impl RowContent for TableCell {}
+
+/// TableRow (Parent) represents a row of cells in a table.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(tag = "type", rename = "footnotedefinition")
+)]
+pub struct TableRow {
+    /// Children node list.
+    pub children: Vec<Node>,
+}
+
+parent!(TableRow, RowContent);
+
+/// TableRow can be used where table content is expected. Its content model is row content.
+impl TableContent for TableRow {}
