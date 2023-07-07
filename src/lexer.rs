@@ -22,6 +22,12 @@ pub struct Lexer<'a> {
     _lookahead: Option<Token>,
 }
 
+impl<'a> From<&'a str> for Lexer<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::new(value)
+    }
+}
+
 impl<'a> Lexer<'a> {
     /// Create new [`Lexer`] from source `S`
     pub fn new(source: &'a str) -> Self {
