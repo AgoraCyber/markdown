@@ -58,27 +58,42 @@ pub trait RowContent {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "type")
 )]
-pub enum Node {
-    Document(Document),
-    Heading(Heading),
+pub enum Node<'cx> {
+    #[serde(borrow)]
+    Document(Document<'cx>),
+    #[serde(borrow)]
+    Heading(Heading<'cx>),
     ThematicBreak(ThematicBreak),
-    Blockquote(Blockquote),
-    List(List),
-    ListItem(ListItem),
-    Code(Code),
-    Definition(Definition),
-    Text(Text),
-    Emphasis(Emphasis),
-    Strong(Strong),
-    InlineCode(InlineCode),
+    #[serde(borrow)]
+    Blockquote(Blockquote<'cx>),
+    #[serde(borrow)]
+    List(List<'cx>),
+    #[serde(borrow)]
+    ListItem(ListItem<'cx>),
+    #[serde(borrow)]
+    Code(Code<'cx>),
+    #[serde(borrow)]
+    Definition(Definition<'cx>),
+    #[serde(borrow)]
+    Text(Text<'cx>),
+    #[serde(borrow)]
+    Emphasis(Emphasis<'cx>),
+    #[serde(borrow)]
+    Strong(Strong<'cx>),
+    #[serde(borrow)]
+    InlineCode(InlineCode<'cx>),
     Break(Break),
-    Link(Link),
-    LinkReference(LinkReference),
-    Image(Image),
-    ImageReference(ImageReference),
+    #[serde(borrow)]
+    Link(Link<'cx>),
+    #[serde(borrow)]
+    LinkReference(LinkReference<'cx>),
+    #[serde(borrow)]
+    Image(Image<'cx>),
+    #[serde(borrow)]
+    ImageReference(ImageReference<'cx>),
 }
 
-impl Debug for Node {
+impl<'cx> Debug for Node<'cx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Document(x) => x.fmt(f),
@@ -102,7 +117,7 @@ impl Debug for Node {
     }
 }
 
-impl Node {
+impl<'cx> Node<'cx> {
     /// Accept new [`Visitor`] to visit this `mdast`
     pub fn accept<V: Visitor>(&self, visitor: &mut V) {
         match self {
@@ -167,13 +182,14 @@ pub trait Visitor {
 
 /// Parent (UnistParent) represents an abstract interface in
 /// mdast containing other nodes (said to be children).
-pub trait Parent<Child>
+pub trait Parent<'cx, Child>
 where
-    Child: Into<Node>,
+    Child: Into<Node<'cx>>,
 {
-    type Iter<'a>: Iterator<Item = &'a Node>
+    type Iter<'a>: Iterator<Item = &'a Node<'cx>>
     where
-        Self: 'a;
+        Self: 'a,
+        'cx: 'a;
 
     /// Addd one child node.
     fn add_child(&mut self, node: Child) -> AstResult<()>;
@@ -187,11 +203,11 @@ where
 
 macro_rules! parent {
     ($node_name:ident) => {
-        impl<Child> Parent<Child> for $node_name
+        impl<'cx, Child> Parent<'cx, Child> for $node_name<'cx>
         where
-            Child: Into<Node>,
+            Child: Into<Node<'cx>>,
         {
-            type Iter<'a> = Iter<'a, Node>;
+            type Iter<'a> = Iter<'a, Node<'cx>> where   'cx: 'a;
 
             fn add_child(&mut self, node: Child) -> AstResult<()> {
                 self.children.push(node.into());
@@ -208,11 +224,11 @@ macro_rules! parent {
         }
     };
     ($node_name:ident,$content_type: ident) => {
-        impl<Child> Parent<Child> for $node_name
+        impl<'cx, Child> Parent<'cx, Child> for $node_name<'cx>
         where
-            Child: Into<Node> + $content_type,
+            Child: Into<Node<'cx>> + $content_type,
         {
-            type Iter<'a> = Iter<'a, Node>;
+            type Iter<'a> = Iter<'a, Node<'cx>> where   'cx: 'a;
 
             fn add_child(&mut self, node: Child) -> AstResult<()> {
                 self.children.push(node.into());
@@ -242,8 +258,9 @@ macro_rules! parent {
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "document")
 )]
-pub struct Document {
-    pub children: Vec<Node>,
+pub struct Document<'cx> {
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Document);
@@ -259,13 +276,14 @@ parent!(Document);
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "paragraph")
 )]
-pub struct Paragraph {
-    pub children: Vec<Node>,
+pub struct Paragraph<'cx> {
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Paragraph, PhrasingContent);
 
-impl FlowContent for Paragraph {}
+impl<'cx> FlowContent for Paragraph<'cx> {}
 
 /// Heading (Parent) represents a heading of a section.
 /// Heading can be used where flow content is expected.
@@ -280,15 +298,16 @@ impl FlowContent for Paragraph {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "heading")
 )]
-pub struct Heading {
+pub struct Heading<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// A depth field must be present.
     /// A value of 1 is said to be the highest rank and 6 the lowest.
     pub depth: usize,
 }
 
-impl Heading {
+impl<'cx> Heading<'cx> {
     /// Create new [`Heading`] instance with provided `depth`
     pub fn new(depth: usize) -> Self {
         assert!(
@@ -305,7 +324,7 @@ impl Heading {
 
 parent!(Heading, PhrasingContent);
 
-impl FlowContent for Heading {}
+impl<'cx> FlowContent for Heading<'cx> {}
 
 /// ThematicBreak (Node) represents a thematic break,
 /// such as a scene change in a story,
@@ -330,14 +349,15 @@ impl FlowContent for ThematicBreak {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "blockquote")
 )]
-pub struct Blockquote {
+pub struct Blockquote<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Blockquote, PhrasingContent);
 
-impl FlowContent for Blockquote {}
+impl<'cx> FlowContent for Blockquote<'cx> {}
 
 /// List (Parent) represents a list of items.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -346,14 +366,15 @@ impl FlowContent for Blockquote {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "list")
 )]
-pub struct List {
+pub struct List<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(List, ListContent);
 
-impl FlowContent for List {}
+impl<'cx> FlowContent for List<'cx> {}
 
 /// ListItem (Parent) represents an item in a List.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -362,14 +383,15 @@ impl FlowContent for List {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "list")
 )]
-pub struct ListItem {
+pub struct ListItem<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(ListItem, FlowContent);
 
-impl ListContent for ListItem {}
+impl<'cx> ListContent for ListItem<'cx> {}
 
 /// Code (Literal) represents a block of preformatted text, such as ASCII art or computer code.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -378,16 +400,16 @@ impl ListContent for ListItem {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "code")
 )]
-pub struct Code {
+pub struct Code<'cx> {
     /// Literal data.
-    pub value: String,
+    pub value: &'cx str,
     /// [`Option`] field to indicate code language.
-    pub lang: Option<String>,
+    pub lang: Option<&'cx str>,
     /// Meta data for code language.
-    pub meta: Option<String>,
+    pub meta: Option<&'cx str>,
 }
 
-impl FlowContent for Code {}
+impl<'cx> FlowContent for Code<'cx> {}
 
 /// Code (Literal) represents a block of preformatted text, such as ASCII art or computer code.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -396,26 +418,27 @@ impl FlowContent for Code {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "definition")
 )]
-pub struct Definition {
+pub struct Definition<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: String,
+    pub identifier: &'cx str,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<String>,
+    pub label: Option<&'cx str>,
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: String,
+    pub url: &'cx str,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<String>,
+    pub title: Option<&'cx str>,
 }
 
-impl FlowContent for Definition {}
+impl<'cx> FlowContent for Definition<'cx> {}
 
 /// Text (Literal) represents everything that is just text.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -424,13 +447,13 @@ impl FlowContent for Definition {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "text")
 )]
-pub struct Text {
+pub struct Text<'cx> {
     /// Text literal value
-    pub value: String,
+    pub value: &'cx str,
 }
 /// Text can be used where phrasing content is expected.
 /// Its content is represented by its value field.
-impl PhrasingContent for Text {}
+impl<'cx> PhrasingContent for Text<'cx> {}
 
 /// Emphasis (Parent) represents stress emphasis of its contents.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -439,16 +462,17 @@ impl PhrasingContent for Text {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "emphasis")
 )]
-pub struct Emphasis {
+pub struct Emphasis<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Emphasis, PhrasingContent);
 
 /// Emphasis can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for Emphasis {}
+impl<'cx> PhrasingContent for Emphasis<'cx> {}
 
 /// Strong (Parent) represents strong importance, seriousness, or urgency for its contents.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -457,16 +481,17 @@ impl PhrasingContent for Emphasis {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "strong")
 )]
-pub struct Strong {
+pub struct Strong<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Strong, PhrasingContent);
 
 /// Strong can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for Strong {}
+impl<'cx> PhrasingContent for Strong<'cx> {}
 
 /// InlineCode (Literal) represents a fragment of computer code, such as a file name,
 /// computer program, or anything a computer could parse.
@@ -476,13 +501,13 @@ impl PhrasingContent for Strong {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "inlinecode")
 )]
-pub struct InlineCode {
+pub struct InlineCode<'cx> {
     /// Text literal value
-    pub value: String,
+    pub value: &'cx str,
 }
 /// InlineCode can be used where phrasing content is expected.
 /// Its content is represented by its value field.
-impl PhrasingContent for InlineCode {}
+impl<'cx> PhrasingContent for InlineCode<'cx> {}
 
 /// InlineCode (Literal) represents a fragment of computer code, such as a file name,
 /// computer program, or anything a computer could parse.
@@ -504,22 +529,23 @@ impl PhrasingContent for Break {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "link")
 )]
-pub struct Link {
+pub struct Link<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: String,
+    pub url: &'cx str,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<String>,
+    pub title: Option<&'cx str>,
 }
 
 parent!(Link, PhrasingContent);
 
 /// Link can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for Link {}
+impl<'cx> PhrasingContent for Link<'cx> {}
 
 /// Link (Parent) represents a hyperlink.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -528,17 +554,18 @@ impl PhrasingContent for Link {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "link")
 )]
-pub struct LinkReference {
+pub struct LinkReference<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: String,
+    pub identifier: &'cx str,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<String>,
+    pub label: Option<&'cx str>,
     /// A referenceType field must be present. Its value must be a referenceType.
     /// It represents the explicitness of the reference.
     pub reference_type: ReferenceType,
@@ -548,7 +575,7 @@ parent!(LinkReference, PhrasingContent);
 
 /// LinkReference can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for LinkReference {}
+impl<'cx> PhrasingContent for LinkReference<'cx> {}
 
 /// Image (Node) represents an image.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -557,22 +584,22 @@ impl PhrasingContent for LinkReference {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "image")
 )]
-pub struct Image {
+pub struct Image<'cx> {
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: String,
+    pub url: &'cx str,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<String>,
+    pub title: Option<&'cx str>,
     /// An alt field should be present.
     /// It represents equivalent content for environments
     /// that cannot represent the node as intended.
-    pub alt: Option<String>,
+    pub alt: Option<&'cx str>,
 }
 
 /// Image can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for Image {}
+impl<'cx> PhrasingContent for Image<'cx> {}
 
 /// Image (Node) represents an image.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -581,22 +608,22 @@ impl PhrasingContent for Image {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "strong")
 )]
-pub struct ImageReference {
+pub struct ImageReference<'cx> {
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: String,
+    pub url: &'cx str,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<String>,
+    pub title: Option<&'cx str>,
     /// An alt field should be present.
     /// It represents equivalent content for environments
     /// that cannot represent the node as intended.
-    pub alt: Option<String>,
+    pub alt: Option<&'cx str>,
 }
 
 /// ImageReference can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for ImageReference {}
+impl<'cx> PhrasingContent for ImageReference<'cx> {}
 
 /// Delete (Parent) represents contents that are no longer accurate or no longer relevant.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -605,16 +632,17 @@ impl PhrasingContent for ImageReference {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "delete")
 )]
-pub struct Delete {
+pub struct Delete<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(Delete, PhrasingContent);
 
 /// ImageReference can be used where phrasing content is expected.
 /// Its content model is phrasing content.
-impl PhrasingContent for Delete {}
+impl<'cx> PhrasingContent for Delete<'cx> {}
 
 /// FootnoteDefinition (Node) represents a marker through association.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -623,24 +651,25 @@ impl PhrasingContent for Delete {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "footnotedefinition")
 )]
-pub struct FootnoteDefinition {
+pub struct FootnoteDefinition<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: String,
+    pub identifier: &'cx str,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<String>,
+    pub label: Option<&'cx str>,
 }
 
 parent!(FootnoteDefinition, FlowContent);
 
 /// FootnoteDefinition can be used where flow content is expected.
 ///  Its content model is also flow content.
-impl FlowContent for FootnoteDefinition {}
+impl<'cx> FlowContent for FootnoteDefinition<'cx> {}
 
 /// FootnoteReference (Node) represents a marker through association.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -649,20 +678,20 @@ impl FlowContent for FootnoteDefinition {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "footnotedefinition")
 )]
-pub struct FootnoteReference {
+pub struct FootnoteReference<'cx> {
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: String,
+    pub identifier: &'cx str,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<String>,
+    pub label: Option<&'cx str>,
 }
 
 /// FootnoteReference can be used where phrasing content is expected.
 /// It has no content model.
-impl PhrasingContent for FootnoteReference {}
+impl<'cx> PhrasingContent for FootnoteReference<'cx> {}
 
 /// Table (Parent) represents two-dimensional data.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -671,9 +700,10 @@ impl PhrasingContent for FootnoteReference {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "table")
 )]
-pub struct Table {
+pub struct Table<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
     /// An align field can be present. If present, it must be a list of alignTypes.
     /// It represents how cells in columns are aligned.
     pub align: Vec<AlignType>,
@@ -683,7 +713,7 @@ parent!(Table, TableContent);
 
 /// FootnoteDefinition can be used where flow content is expected.
 ///  Its content model is also flow content.
-impl FlowContent for Table {}
+impl<'cx> FlowContent for Table<'cx> {}
 
 /// TableCell (Parent) represents a header cell in a Table,
 ///  if its parent is a head, or a data cell otherwise.
@@ -693,16 +723,17 @@ impl FlowContent for Table {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "footnotedefinition")
 )]
-pub struct TableCell {
+pub struct TableCell<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(TableCell, PhrasingContent);
 
 /// TableCell can be used where row content is expected.
 /// Its content model is phrasing content excluding Break nodes.
-impl RowContent for TableCell {}
+impl<'cx> RowContent for TableCell<'cx> {}
 
 /// TableRow (Parent) represents a row of cells in a table.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -711,12 +742,13 @@ impl RowContent for TableCell {}
     derive(serde::Serialize, serde::Deserialize),
     serde(tag = "type", rename = "footnotedefinition")
 )]
-pub struct TableRow {
+pub struct TableRow<'cx> {
     /// Children node list.
-    pub children: Vec<Node>,
+    #[serde(borrow)]
+    pub children: Vec<Node<'cx>>,
 }
 
 parent!(TableRow, RowContent);
 
 /// TableRow can be used where table content is expected. Its content model is row content.
-impl TableContent for TableRow {}
+impl<'cx> TableContent for TableRow<'cx> {}
