@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::ast::*;
 use crate::lexer::*;
 
@@ -42,16 +44,32 @@ impl<'a> Parser<'a> {
             }
         }
     }
-
+    /// Parse flow content:
+    /// Blockquote | Code | Heading | Html | List | ThematicBreak | Content
     fn parse_flow_content(&mut self) -> Result<Option<Node<'a>>, ParserError> {
         let token = self._lexer.next_token();
 
         match token {
+            Token::GreaterThans(range) => return self.parse_block_quote(range).map(Some),
+            Token::Backticks(range) => return self.parse_code(range).map(Some),
+            Token::Pounds(range) => return self.parse_heading(range).map(Some),
             Token::Eof(_) => return Ok(None),
             _ => {
                 unimplemented!()
             }
         }
+    }
+
+    fn parse_block_quote(&mut self, _range: Range<usize>) -> Result<Node<'a>, ParserError> {
+        unimplemented!()
+    }
+
+    fn parse_code(&mut self, _range: Range<usize>) -> Result<Node<'a>, ParserError> {
+        unimplemented!()
+    }
+
+    fn parse_heading(&mut self, _range: Range<usize>) -> Result<Node<'a>, ParserError> {
+        unimplemented!()
     }
 }
 
