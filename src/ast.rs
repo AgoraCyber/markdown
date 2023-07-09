@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{fmt::Debug, slice::Iter};
 
 use thiserror::Error;
@@ -201,6 +202,10 @@ where
     fn iter<'a>(&'a self) -> Self::Iter<'a>;
 }
 
+pub trait ParentEx<'cx> {
+    fn add_child_node(&mut self, node: Node<'cx>) -> AstResult<()>;
+}
+
 macro_rules! parent {
     ($node_name:ident) => {
         impl<'cx, Child> Parent<'cx, Child> for $node_name<'cx>
@@ -220,6 +225,14 @@ macro_rules! parent {
 
             fn remove_at(&mut self, index: usize) -> Node {
                 self.children.remove(index)
+            }
+        }
+
+        impl<'cx> ParentEx<'cx> for $node_name<'cx> {
+            fn add_child_node(&mut self, node: Node<'cx>) -> AstResult<()> {
+                self.children.push(node);
+
+                Ok(())
             }
         }
     };
@@ -243,8 +256,35 @@ macro_rules! parent {
                 self.children.remove(index)
             }
         }
+
+        impl<'cx> ParentEx<'cx> for $node_name<'cx> {
+            fn add_child_node(&mut self, node: Node<'cx>) -> AstResult<()> {
+                self.children.push(node);
+
+                Ok(())
+            }
+        }
     };
 }
+
+macro_rules! node_into {
+    ($node_name:ident<'a>) => {
+        impl<'a> From<$node_name<'a>> for Node<'a> {
+            fn from(value: Text<'a>) -> Self {
+                Node::$node_name(value)
+            }
+        }
+    };
+    ($node_name:ident) => {
+        impl<'a> From<$node_name> for Node<'a> {
+            fn from(value: Text<'a>) -> Self {
+                Node::$node_name(value)
+            }
+        }
+    };
+}
+
+node_into!(Text<'a>);
 
 /// Document.
 ///
@@ -402,11 +442,11 @@ impl<'cx> ListContent for ListItem<'cx> {}
 )]
 pub struct Code<'cx> {
     /// Literal data.
-    pub value: &'cx str,
+    pub value: Cow<'cx, str>,
     /// [`Option`] field to indicate code language.
-    pub lang: Option<&'cx str>,
+    pub lang: Option<Cow<'cx, str>>,
     /// Meta data for code language.
-    pub meta: Option<&'cx str>,
+    pub meta: Option<Cow<'cx, str>>,
 }
 
 impl<'cx> FlowContent for Code<'cx> {}
@@ -425,17 +465,17 @@ pub struct Definition<'cx> {
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: &'cx str,
+    pub identifier: Cow<'cx, str>,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<&'cx str>,
+    pub label: Option<Cow<'cx, str>>,
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: &'cx str,
+    pub url: Cow<'cx, str>,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<&'cx str>,
+    pub title: Option<Cow<'cx, str>>,
 }
 
 impl<'cx> FlowContent for Definition<'cx> {}
@@ -449,7 +489,7 @@ impl<'cx> FlowContent for Definition<'cx> {}
 )]
 pub struct Text<'cx> {
     /// Text literal value
-    pub value: &'cx str,
+    pub value: Cow<'cx, str>,
 }
 /// Text can be used where phrasing content is expected.
 /// Its content is represented by its value field.
@@ -503,7 +543,7 @@ impl<'cx> PhrasingContent for Strong<'cx> {}
 )]
 pub struct InlineCode<'cx> {
     /// Text literal value
-    pub value: &'cx str,
+    pub value: Cow<'cx, str>,
 }
 /// InlineCode can be used where phrasing content is expected.
 /// Its content is represented by its value field.
@@ -534,11 +574,11 @@ pub struct Link<'cx> {
     #[serde(borrow)]
     pub children: Vec<Node<'cx>>,
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: &'cx str,
+    pub url: Cow<'cx, str>,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<&'cx str>,
+    pub title: Option<Cow<'cx, str>>,
 }
 
 parent!(Link, PhrasingContent);
@@ -561,11 +601,11 @@ pub struct LinkReference<'cx> {
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: &'cx str,
+    pub identifier: Cow<'cx, str>,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<&'cx str>,
+    pub label: Option<Cow<'cx, str>>,
     /// A referenceType field must be present. Its value must be a referenceType.
     /// It represents the explicitness of the reference.
     pub reference_type: ReferenceType,
@@ -586,15 +626,15 @@ impl<'cx> PhrasingContent for LinkReference<'cx> {}
 )]
 pub struct Image<'cx> {
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: &'cx str,
+    pub url: Cow<'cx, str>,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<&'cx str>,
+    pub title: Option<Cow<'cx, str>>,
     /// An alt field should be present.
     /// It represents equivalent content for environments
     /// that cannot represent the node as intended.
-    pub alt: Option<&'cx str>,
+    pub alt: Option<Cow<'cx, str>>,
 }
 
 /// Image can be used where phrasing content is expected.
@@ -610,15 +650,15 @@ impl<'cx> PhrasingContent for Image<'cx> {}
 )]
 pub struct ImageReference<'cx> {
     /// A url field must be present. It represents a URL to the referenced resource.
-    pub url: &'cx str,
+    pub url: Cow<'cx, str>,
     /// A title field can be present.
     /// It represents advisory information for the resource,
     /// such as would be appropriate for a tooltip.
-    pub title: Option<&'cx str>,
+    pub title: Option<Cow<'cx, str>>,
     /// An alt field should be present.
     /// It represents equivalent content for environments
     /// that cannot represent the node as intended.
-    pub alt: Option<&'cx str>,
+    pub alt: Option<Cow<'cx, str>>,
 }
 
 /// ImageReference can be used where phrasing content is expected.
@@ -658,11 +698,11 @@ pub struct FootnoteDefinition<'cx> {
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: &'cx str,
+    pub identifier: Cow<'cx, str>,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<&'cx str>,
+    pub label: Option<Cow<'cx, str>>,
 }
 
 parent!(FootnoteDefinition, FlowContent);
@@ -682,11 +722,11 @@ pub struct FootnoteReference<'cx> {
     /// An identifier field must be present. It can match another node.
     /// identifier is a source value: character escapes and character
     /// references are not parsed. Its value must be normalized.
-    pub identifier: &'cx str,
+    pub identifier: Cow<'cx, str>,
     /// A label field can be present.
     /// label is a string value: it works just like title on a link or a lang on
     /// code: character escapes and character references are parsed.
-    pub label: Option<&'cx str>,
+    pub label: Option<Cow<'cx, str>>,
 }
 
 /// FootnoteReference can be used where phrasing content is expected.

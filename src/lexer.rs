@@ -1,4 +1,4 @@
-use std::{ops::Range, str::Chars};
+use std::{borrow::Cow, ops::Range, str::Chars};
 
 use crate::ast::AlignType;
 
@@ -213,10 +213,16 @@ impl<'a> Lexer<'a> {
     }
 
     /// Convert token to [`&str`](AsRef<str>)
-    pub fn token_as_str<T: AsRef<Token>>(&mut self, token: T) -> &str {
+    pub fn token_as_str<T: AsRef<Token>>(&mut self, token: T) -> Cow<'a, str> {
         let range = token.as_ref().to_range();
 
-        &self._source[range]
+        Cow::Borrowed(&self._source[range])
+    }
+
+    pub fn range_as_str<R: Into<Range<usize>>>(&self, r: R) -> Cow<'a, str> {
+        let range = r.into();
+
+        Cow::Borrowed(&self._source[range])
     }
 
     /// consume chars until `F` returns false

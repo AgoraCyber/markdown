@@ -67,8 +67,31 @@ impl<'a> Parser<'a> {
     fn parse_code(&mut self, _range: Range<usize>) -> Result<Node<'a>, ParserError> {
         unimplemented!()
     }
+    /// expect: #* ws plaintext
+    fn parse_heading(&mut self, pounds: Range<usize>) -> Result<Node<'a>, ParserError> {
+        let expect = self._lexer.lookahead();
 
-    fn parse_heading(&mut self, _range: Range<usize>) -> Result<Node<'a>, ParserError> {
+        match expect {
+            Token::WhiteSpaces(range) => {
+                let mut heading = Heading::new(pounds.len());
+
+                if range.len() > 1 {
+                    let value = self._lexer.range_as_str(range.start + 1..range.end);
+                    heading.add_child(Text {
+                        value: value.into(),
+                    })?;
+                }
+                while let Some(content) = self.parse_phrasing_content()? {
+                    heading.add_child_node(content)?;
+                }
+            }
+            _ => {}
+        }
+
+        unimplemented!()
+    }
+
+    fn parse_phrasing_content(&mut self) -> Result<Option<Node<'a>>, ParserError> {
         unimplemented!()
     }
 }
