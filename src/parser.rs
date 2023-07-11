@@ -81,17 +81,27 @@ impl<'a> Parser<'a> {
                         value: value.into(),
                     })?;
                 }
+
+                self._lexer.next();
+
                 while let Some(content) = self.parse_phrasing_content()? {
                     heading.add_child_node(content)?;
                 }
-            }
-            _ => {}
-        }
 
-        unimplemented!()
+                Ok(Node::Heading(heading))
+            }
+            _ => {
+                // maybe this is a normal paragraph
+                self.parse_paragraph()
+            }
+        }
     }
 
     fn parse_phrasing_content(&mut self) -> Result<Option<Node<'a>>, ParserError> {
+        unimplemented!()
+    }
+
+    fn parse_paragraph(&mut self) -> Result<Node<'a>, ParserError> {
         unimplemented!()
     }
 }
